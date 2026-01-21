@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "install-all": "cd backend && npm install && cd ../mobile && npm install",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd mobile && npm start\"",
+    "backend": "cd backend && npm run dev",
+    "mobile": "cd mobile && npm start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
