@@ -6,43 +6,46 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  FlatList,
   RefreshControl,
 } from 'react-native';
 import { Avatar, Button, ActivityIndicator } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { postService } from '../../services';
+import { userService, postService } from '../../services';
 import PostCard from '../../components/PostCard';
 
-export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+export default function UserProfileScreen() {
+  const { id } = useLocalSearchParams();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
+  const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [following, setFollowing] = useState(false);
 
   useEffect(() => {
-    if (user?._id) {
-      loadUserPosts();
+    if (id) {
+      loadUserProfile();
     }
-  }, [user]);
+  }, [id]);
 
-  const loadUserPosts = async () => {
-    if (!user?._id) {
-      console.log('No user ID available');
-      setLoading(false);
-      return;
-    }
-    
+  const loadUserProfile = async () => {
     try {
-      console.log('Loading posts for user:', user._id);
-      const data = await postService.getUserPosts(user._id);
-      console.log('Posts loaded:', data.posts?.length || 0);
-      setPosts(data.posts || []);
+      const [userData, postsData] = await Promise.all([
+        userService.getUserProfile(id),
+        postService.getUserPosts(id)
+      ]);
+      
+      setUser(userData);
+      setPosts(postsData.posts || []);
+      
+      // Check if current user is following this user
+      if (currentUser && userData.followers) {
+        setFollowing(userData.followers.some(f => f._id === currentUser._id || f === currentUser._id));
+      }
     } catch (error) {
-      console.error('Error loading user posts:', error);
-      console.error('Error details:', error.response?.data || error.message);
+      console.error('Error loading user profile:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -51,17 +54,47 @@ export default function ProfileScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadUserPosts();
+    loadUserProfile();
+  };
+
+  const handleFollowToggle = async () => {
+    try {
+      if (following) {
+        await userService.unfollowUser(id);
+        setFollowing(false);
+      } else {
+        await userService.followUser(id);
+        setFollowing(true);
+      }
+      // Reload to get updated follower count
+      loadUserProfile();
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+    }
   };
 
   const handleDeletePost = (postId) => {
     setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postId));
   };
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/login');
-  };
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.loader}>
+        <Text style={styles.errorText}>User not found</Text>
+        <Button onPress={() => router.back()}>Go Back</Button>
+      </View>
+    );
+  }
+
+  const isOwnProfile = currentUser && currentUser._id === id;
 
   return (
     <View style={styles.container}>
@@ -71,13 +104,14 @@ export default function ProfileScreen() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity onPress={handleLogout}>
-            <Text style={styles.logoutButton}>Logout</Text>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.placeholder} />
         </View>
 
-        {user?.coverPhoto && (
+        {user.coverPhoto && (
           <Image source={{ uri: user.coverPhoto }} style={styles.coverPhoto} />
         )}
 
@@ -85,26 +119,26 @@ export default function ProfileScreen() {
           <Avatar.Image
             size={100}
             source={{
-              uri: user?.profilePicture || 'https://via.placeholder.com/100',
+              uri: user.profilePicture || 'https://via.placeholder.com/100',
             }}
             style={styles.avatar}
           />
 
           <View style={styles.nameSection}>
             <View style={styles.nameRow}>
-              <Text style={styles.fullName}>{user?.fullName}</Text>
-              {user?.isVerified && <Text style={styles.verified}>✓</Text>}
+              <Text style={styles.fullName}>{user.fullName}</Text>
+              {user.isVerified && <Text style={styles.verified}>✓</Text>}
             </View>
-            <Text style={styles.username}>@{user?.username}</Text>
+            <Text style={styles.username}>@{user.username}</Text>
           </View>
 
-          {user?.bio && (
+          {user.bio && (
             <Text style={styles.bio}>{user.bio}</Text>
           )}
 
           <View style={styles.statsRow}>
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>{user?.followers?.length || 0}</Text>
+              <Text style={styles.statNumber}>{user.followers?.length || 0}</Text>
               <Text style={styles.statLabel}>Followers</Text>
             </View>
             <View style={styles.stat}>
@@ -112,27 +146,25 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>Posts</Text>
             </View>
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>{user?.following?.length || 0}</Text>
+              <Text style={styles.statNumber}>{user.following?.length || 0}</Text>
               <Text style={styles.statLabel}>Following</Text>
             </View>
           </View>
 
-          <Button
-            mode="outlined"
-            onPress={() => router.push('/edit-profile')}
-            style={styles.editButton}
-          >
-            Edit Profile
-          </Button>
+          {!isOwnProfile && (
+            <Button
+              mode={following ? 'outlined' : 'contained'}
+              onPress={handleFollowToggle}
+              style={styles.followButton}
+            >
+              {following ? 'Unfollow' : 'Follow'}
+            </Button>
+          )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Posts</Text>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" />
-            </View>
-          ) : posts.length === 0 ? (
+          <Text style={styles.sectionTitle}>Posts</Text>
+          {posts.length === 0 ? (
             <Text style={styles.emptyText}>No posts yet</Text>
           ) : (
             posts.map((post) => (
@@ -150,6 +182,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -159,13 +201,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  backButton: {
+    fontSize: 16,
+    color: '#007AFF',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
   },
-  logoutButton: {
-    fontSize: 16,
-    color: '#FF3B30',
+  placeholder: {
+    width: 50,
   },
   coverPhoto: {
     width: '100%',
@@ -226,7 +271,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
-  editButton: {
+  followButton: {
     marginTop: 20,
     width: '100%',
   },
@@ -241,10 +286,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 16,
     paddingTop: 16,
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
   },
   emptyText: {
     fontSize: 14,
