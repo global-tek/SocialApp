@@ -4,6 +4,11 @@ const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const userController = require('../controllers/userController');
 
+// @route   GET /api/users/search
+// @desc    Search users
+// @access  Public
+router.get('/search', userController.searchUsers);
+
 // @route   GET /api/users/:id
 // @desc    Get user profile by ID
 // @access  Public
@@ -43,10 +48,5 @@ router.get('/:id/followers', userController.getFollowers);
 // @desc    Get users that user is following
 // @access  Public
 router.get('/:id/following', userController.getFollowing);
-
-// @route   GET /api/users/search
-// @desc    Search users
-// @access  Public
-router.get('/search', userController.searchUsers);
 
 module.exports = router;

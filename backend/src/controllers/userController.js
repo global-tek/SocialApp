@@ -6,7 +6,14 @@ const streamifier = require('streamifier');
 const uploadToCloudinary = (buffer, folder) => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
-      { folder: folder },
+      { 
+        folder: folder,
+        format: 'jpg', // Convert HEIC/HEIF to JPG
+        transformation: [
+          { quality: 'auto:good' },
+          { fetch_format: 'auto' }
+        ]
+      },
       (error, result) => {
         if (error) reject(error);
         else resolve(result);

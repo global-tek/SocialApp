@@ -54,7 +54,8 @@ export default function CreatePostScreen() {
         text,
         media: media.map((m) => ({
           uri: m.uri,
-          type: m.type,
+          type: m.type || m.mimeType || 'image/jpeg',
+          fileName: m.fileName || `image_${Date.now()}.jpg`,
         })),
       });
       

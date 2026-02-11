@@ -52,6 +52,10 @@ export default function FeedScreen() {
     }
   };
 
+  const handleDeletePost = (postId) => {
+    setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postId));
+  };
+
   const renderFooter = () => {
     if (!loading) return null;
     return (
@@ -88,7 +92,7 @@ export default function FeedScreen() {
       </View>
       <FlatList
         data={posts}
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={({ item }) => <PostCard post={item} onDelete={handleDeletePost} />}
         keyExtractor={(item) => item._id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

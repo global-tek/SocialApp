@@ -6,16 +6,20 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  Alert,
 } from 'react-native';
-import { Avatar, IconButton } from 'react-native-paper';
+import { Avatar, IconButton, Menu } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { postService } from '../services';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
-export default function PostCard({ post }) {
+export default function PostCard({ post, onDelete }) {
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes?.length || 0);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const { user } = useAuth();
   const router = useRouter();
 
   const handleLike = async () => {
@@ -32,6 +36,37 @@ export default function PostCard({ post }) {
       console.error('Error liking post:', error);
     }
   };
+
+  const handleDelete = async () => {
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this post? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await postService.deletePost(post._id);
+              if (onDelete) {
+                onDelete(post._id);
+              }
+              Alert.alert('Success', 'Post deleted successfully');
+            } catch (error) {
+              console.error('Error deleting post:', error);
+              Alert.alert('Error', 'Failed to delete post. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const isOwnPost = user && post.author._id === user._id;
 
   const formatDate = (date) => {
     const now = new Date();
@@ -71,6 +106,29 @@ export default function PostCard({ post }) {
             <Text style={styles.timestamp}>{formatDate(post.createdAt)}</Text>
           </View>
         </TouchableOpacity>
+        
+        {isOwnPost && (
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={
+              <IconButton
+                icon="dots-vertical"
+                size={24}
+                onPress={() => setMenuVisible(true)}
+              />
+            }
+          >
+            <Menu.Item
+              onPress={() => {
+                setMenuVisible(false);
+                handleDelete();
+              }}
+              title="Delete Post"
+              leadingIcon="delete"
+            />
+          </Menu>
+        )}
       </View>
 
       {post.content.text && (

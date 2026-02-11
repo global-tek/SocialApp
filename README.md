@@ -58,10 +58,12 @@ socialApp/
 
 ## 📋 Prerequisites
 
-- Node.js (v14 or higher)
+- **Node.js v18 LTS or higher** (v12 will NOT work with Expo)
+  - Check version: `node --version`
+  - If you have v12, see `NODEJS_FIX.md` for upgrade instructions
 - MongoDB (local or MongoDB Atlas)
 - Cloudinary account (for media storage)
-- Expo CLI (for mobile development)
+- Expo CLI (installed automatically with the project)
 - iOS Simulator (Mac) or Android Emulator
 
 ## 🚀 Getting Started

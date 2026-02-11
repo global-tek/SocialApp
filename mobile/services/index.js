@@ -54,10 +54,22 @@ export const userService = {
 
   async uploadProfilePicture(imageUri) {
     const formData = new FormData();
+    
+    // Extract file extension for proper handling
+    const fileExtension = imageUri.split('.').pop().toLowerCase();
+    let mimeType = 'image/jpeg';
+    
+    // Handle different image formats including HEIC from iPhone
+    if (fileExtension === 'heic' || fileExtension === 'heif') {
+      mimeType = 'image/heic';
+    } else if (fileExtension === 'png') {
+      mimeType = 'image/png';
+    }
+    
     formData.append('profilePicture', {
       uri: imageUri,
-      type: 'image/jpeg',
-      name: 'profile.jpg',
+      type: mimeType,
+      name: `profile.${fileExtension}`,
     });
 
     const response = await api.put('/users/profile-picture', formData, {
@@ -94,10 +106,23 @@ export const postService = {
     
     if (postData.media && postData.media.length > 0) {
       postData.media.forEach((media, index) => {
+        // Handle iPhone HEIC/HEIF and other formats
+        const fileExtension = media.uri.split('.').pop().toLowerCase();
+        let mimeType = media.type || 'image/jpeg';
+        
+        // Map common extensions to MIME types
+        if (fileExtension === 'heic' || fileExtension === 'heif') {
+          mimeType = 'image/heic';
+        } else if (fileExtension === 'png') {
+          mimeType = 'image/png';
+        } else if (fileExtension === 'jpg' || fileExtension === 'jpeg') {
+          mimeType = 'image/jpeg';
+        }
+        
         formData.append('media', {
           uri: media.uri,
-          type: media.type,
-          name: `media_${index}.${media.type.split('/')[1]}`,
+          type: mimeType,
+          name: `media_${index}.${fileExtension}`,
         });
       });
     }

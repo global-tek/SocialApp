@@ -8,7 +8,12 @@ const uploadToCloudinary = (buffer, resourceType = 'auto') => {
     const uploadStream = cloudinary.uploader.upload_stream(
       { 
         folder: 'socialapp/posts',
-        resource_type: resourceType
+        resource_type: resourceType,
+        format: resourceType === 'image' ? 'jpg' : undefined, // Convert HEIC/HEIF to JPG
+        transformation: resourceType === 'image' ? [
+          { quality: 'auto:good' },
+          { fetch_format: 'auto' }
+        ] : undefined
       },
       (error, result) => {
         if (error) reject(error);

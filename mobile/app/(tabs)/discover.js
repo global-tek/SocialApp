@@ -36,6 +36,10 @@ export default function DiscoverScreen() {
     loadDiscover();
   };
 
+  const handleDeletePost = (postId) => {
+    setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postId));
+  };
+
   if (loading) {
     return (
       <View style={styles.loader}>
@@ -51,7 +55,7 @@ export default function DiscoverScreen() {
       </View>
       <FlatList
         data={posts}
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={({ item }) => <PostCard post={item} onDelete={handleDeletePost} />}
         keyExtractor={(item) => item._id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
