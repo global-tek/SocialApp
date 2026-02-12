@@ -48,6 +48,22 @@ const postSchema = new mongoose.Schema({
       required: true,
       maxlength: [1000, 'Comment must not exceed 1000 characters']
     },
+    replies: [{
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      text: {
+        type: String,
+        required: true,
+        maxlength: [1000, 'Reply must not exceed 1000 characters']
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
     createdAt: {
       type: Date,
       default: Date.now

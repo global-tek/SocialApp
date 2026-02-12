@@ -88,8 +88,9 @@ exports.createPost = async (req, res) => {
 exports.getPost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate('author', 'username fullName profilePicture isVerified')
-      .populate('comments.user', 'username fullName profilePicture')
+      .populate('author', 'username fullName profilePicture isVerified avatarColor')
+      .populate('comments.user', 'username fullName profilePicture avatarColor')
+      .populate('comments.replies.user', 'username fullName profilePicture avatarColor')
       .populate('likes', 'username fullName profilePicture');
 
     if (!post) {
@@ -315,11 +316,12 @@ exports.commentPost = async (req, res) => {
 
     post.comments.push({
       user: req.user._id,
-      text
+      text,
+      replies: []
     });
 
     await post.save();
-    await post.populate('comments.user', 'username fullName profilePicture');
+    await post.populate('comments.user', 'username fullName profilePicture avatarColor');
 
     res.status(200).json({
       success: true,
@@ -377,6 +379,62 @@ exports.deleteComment = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Comment deleted successfully'
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// @desc    Reply to a comment
+// @route   POST /api/posts/:id/comment/:commentId/reply
+// @access  Private
+exports.replyToComment = async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text || text.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Reply text is required'
+      });
+    }
+
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    const comment = post.comments.id(req.params.commentId);
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Comment not found'
+      });
+    }
+
+    comment.replies.push({
+      user: req.user._id,
+      text
+    });
+
+    await post.save();
+    await post.populate('comments.replies.user', 'username fullName profilePicture avatarColor');
+
+    res.status(200).json({
+      success: true,
+      message: 'Reply added successfully',
+      data: {
+        reply: comment.replies[comment.replies.length - 1]
+      }
     });
   } catch (error) {
     console.error(error);

@@ -31,6 +31,7 @@ export default function PostCard({ post, onDelete }) {
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState(post.comments || []);
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // { commentId, username }
   const { user } = useAuth();
   const router = useRouter();
 
@@ -83,28 +84,71 @@ export default function PostCard({ post, onDelete }) {
 
     setSubmittingComment(true);
     try {
-      const response = await postService.commentPost(post._id, commentText);
-      // Add the new comment to the list
-      const newComment = {
-        _id: Date.now().toString(),
-        user: {
-          _id: user._id,
-          username: user.username,
-          fullName: user.fullName,
-          profilePicture: user.profilePicture,
-        },
-        text: commentText,
-        createdAt: new Date().toISOString(),
-      };
-      setComments([...comments, newComment]);
+      // Check if we're replying to a comment or posting a new comment
+      if (replyingTo) {
+        const response = await postService.replyToComment(post._id, replyingTo.commentId, commentText);
+        
+        // Add the reply to the specific comment
+        const updatedComments = comments.map(comment => {
+          if (comment._id === replyingTo.commentId) {
+            const newReply = {
+              _id: Date.now().toString(),
+              user: {
+                _id: user._id,
+                username: user.username,
+                fullName: user.fullName,
+                profilePicture: user.profilePicture,
+                avatarColor: user.avatarColor,
+              },
+              text: commentText,
+              createdAt: new Date().toISOString(),
+            };
+            return {
+              ...comment,
+              replies: [...(comment.replies || []), newReply]
+            };
+          }
+          return comment;
+        });
+        setComments(updatedComments);
+        setReplyingTo(null);
+        Alert.alert('Success', 'Reply added');
+      } else {
+        const response = await postService.commentPost(post._id, commentText);
+        // Add the new comment to the list
+        const newComment = {
+          _id: Date.now().toString(),
+          user: {
+            _id: user._id,
+            username: user.username,
+            fullName: user.fullName,
+            profilePicture: user.profilePicture,
+            avatarColor: user.avatarColor,
+          },
+          text: commentText,
+          replies: [],
+          createdAt: new Date().toISOString(),
+        };
+        setComments([...comments, newComment]);
+        Alert.alert('Success', 'Comment added');
+      }
       setCommentText('');
-      Alert.alert('Success', 'Comment added');
     } catch (error) {
-      console.error('Error adding comment:', error);
-      Alert.alert('Error', 'Failed to add comment');
+      console.error('Error adding comment/reply:', error);
+      Alert.alert('Error', replyingTo ? 'Failed to add reply' : 'Failed to add comment');
     } finally {
       setSubmittingComment(false);
     }
+  };
+
+  const handleReply = (commentId, username) => {
+    setReplyingTo({ commentId, username });
+    setCommentText(`@${username} `);
+  };
+
+  const cancelReply = () => {
+    setReplyingTo(null);
+    setCommentText('');
   };
 
   const handleShare = async () => {
@@ -305,16 +349,50 @@ export default function PostCard({ post, onDelete }) {
               <Text style={styles.noComments}>No comments yet. Be the first to comment!</Text>
             ) : (
               comments.map((comment) => (
-                <View key={comment._id} style={styles.commentItem}>
-                  <UserAvatar user={comment.user} size={32} />
-                  <View style={styles.commentContent}>
-                    <Text style={styles.commentAuthor}>{comment.user?.fullName || 'Unknown'}</Text>
-                    <Text style={styles.commentText}>{comment.text}</Text>
+                <View key={comment._id}>
+                  <View style={styles.commentItem}>
+                    <UserAvatar user={comment.user} size={32} />
+                    <View style={styles.commentContent}>
+                      <Text style={styles.commentAuthor}>{comment.user?.fullName || 'Unknown'}</Text>
+                      <Text style={styles.commentText}>{comment.text}</Text>
+                      <TouchableOpacity 
+                        onPress={() => handleReply(comment._id, comment.user?.username)}
+                        style={styles.replyButton}
+                      >
+                        <Text style={styles.replyButtonText}>Reply</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
+                  
+                  {/* Render replies */}
+                  {comment.replies && comment.replies.length > 0 && (
+                    <View style={styles.repliesContainer}>
+                      {comment.replies.map((reply) => (
+                        <View key={reply._id} style={styles.replyItem}>
+                          <UserAvatar user={reply.user} size={24} />
+                          <View style={styles.replyContent}>
+                            <Text style={styles.replyAuthor}>{reply.user?.fullName || 'Unknown'}</Text>
+                            <Text style={styles.replyText}>{reply.text}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               ))
             )}
           </ScrollView>
+
+          {replyingTo && (
+            <View style={styles.replyingToContainer}>
+              <Text style={styles.replyingToText}>
+                Replying to @{replyingTo.username}
+              </Text>
+              <TouchableOpacity onPress={cancelReply}>
+                <Text style={styles.cancelReplyButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={styles.commentInputContainer}>
             <TextInput
@@ -488,6 +566,60 @@ const styles = StyleSheet.create({
   commentText: {
     fontSize: 14,
     color: '#333',
+  },
+  replyButton: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  replyButtonText: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  repliesContainer: {
+    marginLeft: 44,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  replyItem: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    gap: 8,
+  },
+  replyContent: {
+    flex: 1,
+    backgroundColor: '#f9f9f9',
+    padding: 10,
+    borderRadius: 10,
+  },
+  replyAuthor: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  replyText: {
+    fontSize: 13,
+    color: '#333',
+  },
+  replyingToContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#E3F2FF',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  replyingToText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  cancelReplyButton: {
+    fontSize: 20,
+    color: '#666',
+    paddingHorizontal: 8,
   },
   commentInputContainer: {
     flexDirection: 'row',

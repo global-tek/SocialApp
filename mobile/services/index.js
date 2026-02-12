@@ -159,6 +159,11 @@ export const postService = {
     return response.data;
   },
 
+  async replyToComment(postId, commentId, text) {
+    const response = await api.post(`/posts/${postId}/comment/${commentId}/reply`, { text });
+    return response.data;
+  },
+
   async deletePost(postId) {
     const response = await api.delete(`/posts/${postId}`);
     return response.data;

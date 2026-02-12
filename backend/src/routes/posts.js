@@ -39,6 +39,11 @@ router.post('/:id/unlike', protect, postController.unlikePost);
 // @access  Private
 router.post('/:id/comment', protect, postController.commentPost);
 
+// @route   POST /api/posts/:id/comment/:commentId/reply
+// @desc    Reply to a comment
+// @access  Private
+router.post('/:id/comment/:commentId/reply', protect, postController.replyToComment);
+
 // @route   DELETE /api/posts/:id/comment/:commentId
 // @desc    Delete a comment
 // @access  Private
