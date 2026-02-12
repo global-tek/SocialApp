@@ -59,11 +59,12 @@ exports.getUserProfile = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { fullName, bio, username } = req.body;
+    const { fullName, bio, username, avatarColor } = req.body;
 
     const updateFields = {};
     if (fullName) updateFields.fullName = fullName;
     if (bio !== undefined) updateFields.bio = bio;
+    if (avatarColor) updateFields.avatarColor = avatarColor;
     if (username) {
       // Check if username is already taken
       const existingUser = await User.findOne({ username, _id: { $ne: req.user._id } });

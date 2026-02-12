@@ -13,6 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { userService, postService } from '../../services';
 import PostCard from '../../components/PostCard';
+import UserAvatar from '../../components/UserAvatar';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams();
@@ -116,11 +117,9 @@ export default function UserProfileScreen() {
         )}
 
         <View style={styles.profileSection}>
-          <Avatar.Image
+          <UserAvatar
+            user={user}
             size={100}
-            source={{
-              uri: user.profilePicture || 'https://via.placeholder.com/100',
-            }}
             style={styles.avatar}
           />
 

@@ -7,11 +7,19 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Share,
 } from 'react-native';
-import { Avatar, IconButton, Menu } from 'react-native-paper';
+import * as Clipboard from 'expo-clipboard';
+import { Avatar, IconButton, Menu, Button } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { postService } from '../services';
 import { useAuth } from '../context/AuthContext';
+import UserAvatar from './UserAvatar';
 
 const { width } = Dimensions.get('window');
 
@@ -19,6 +27,10 @@ export default function PostCard({ post, onDelete }) {
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes?.length || 0);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState(post.comments || []);
+  const [submittingComment, setSubmittingComment] = useState(false);
   const { user } = useAuth();
   const router = useRouter();
 
@@ -66,6 +78,87 @@ export default function PostCard({ post, onDelete }) {
     );
   };
 
+  const handleComment = async () => {
+    if (!commentText.trim()) return;
+
+    setSubmittingComment(true);
+    try {
+      const response = await postService.commentPost(post._id, commentText);
+      // Add the new comment to the list
+      const newComment = {
+        _id: Date.now().toString(),
+        user: {
+          _id: user._id,
+          username: user.username,
+          fullName: user.fullName,
+          profilePicture: user.profilePicture,
+        },
+        text: commentText,
+        createdAt: new Date().toISOString(),
+      };
+      setComments([...comments, newComment]);
+      setCommentText('');
+      Alert.alert('Success', 'Comment added');
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      Alert.alert('Error', 'Failed to add comment');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      // Generate shareable content
+      const postUrl = `https://socialapp.com/post/${post._id}`; // Replace with your actual domain
+      const shareMessage = post.content.text 
+        ? `${post.content.text}\n\nShared from SocialApp by ${post.author.fullName}`
+        : `Check out this post by ${post.author.fullName} on SocialApp`;
+
+      // Try native share first
+      const result = await Share.share(
+        {
+          message: Platform.OS === 'ios' ? shareMessage : `${shareMessage}\n\n${postUrl}`,
+          url: Platform.OS === 'ios' ? postUrl : undefined,
+          title: 'Share Post',
+        },
+        {
+          // iOS only
+          subject: 'Check out this post on SocialApp',
+          dialogTitle: 'Share this post',
+        }
+      );
+
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Shared with activity type (iOS)
+          console.log('Shared via:', result.activityType);
+        } else {
+          // Shared successfully (Android)
+          console.log('Post shared successfully');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // Share dialog was dismissed
+        console.log('Share dismissed');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      // Fallback: Copy link to clipboard
+      await handleCopyLink();
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      const postUrl = `https://socialapp.com/post/${post._id}`;
+      await Clipboard.setStringAsync(postUrl);
+      Alert.alert('Link Copied', 'Post link has been copied to clipboard');
+    } catch (error) {
+      console.error('Error copying link:', error);
+      Alert.alert('Error', 'Failed to copy link');
+    }
+  };
+
   const isOwnPost = user && post.author._id === user._id;
 
   const formatDate = (date) => {
@@ -90,12 +183,7 @@ export default function PostCard({ post, onDelete }) {
           style={styles.authorInfo}
           onPress={() => router.push(`/user/${post.author._id}`)}
         >
-          <Avatar.Image
-            size={40}
-            source={{
-              uri: post.author.profilePicture || 'https://via.placeholder.com/40',
-            }}
-          />
+          <UserAvatar user={post.author} size={40} />
           <View style={styles.authorText}>
             <View style={styles.nameRow}>
               <Text style={styles.authorName}>{post.author.fullName}</Text>
@@ -181,17 +269,74 @@ export default function PostCard({ post, onDelete }) {
           <Text style={styles.actionText}>{likesCount}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.action}>
+        <TouchableOpacity style={styles.action} onPress={() => setCommentModalVisible(true)}>
           <IconButton icon="comment-outline" size={24} iconColor="#666" />
           <Text style={styles.actionText}>
-            {post.comments?.length || 0}
+            {comments.length}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.action}>
+        <TouchableOpacity style={styles.action} onPress={handleShare}>
           <IconButton icon="share-outline" size={24} iconColor="#666" />
         </TouchableOpacity>
       </View>
+
+      {/* Comments Modal */}
+      <Modal
+        visible={commentModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setCommentModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setCommentModalVisible(false)}>
+              <Text style={styles.modalCloseButton}>Close</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Comments</Text>
+            <View style={styles.modalPlaceholder} />
+          </View>
+
+          <ScrollView style={styles.commentsList}>
+            {comments.length === 0 ? (
+              <Text style={styles.noComments}>No comments yet. Be the first to comment!</Text>
+            ) : (
+              comments.map((comment) => (
+                <View key={comment._id} style={styles.commentItem}>
+                  <UserAvatar user={comment.user} size={32} />
+                  <View style={styles.commentContent}>
+                    <Text style={styles.commentAuthor}>{comment.user?.fullName || 'Unknown'}</Text>
+                    <Text style={styles.commentText}>{comment.text}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+
+          <View style={styles.commentInputContainer}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Write a comment..."
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+              maxLength={500}
+            />
+            <Button
+              mode="contained"
+              onPress={handleComment}
+              disabled={!commentText.trim() || submittingComment}
+              loading={submittingComment}
+              compact
+            >
+              Post
+            </Button>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -289,5 +434,76 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: -8,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalCloseButton: {
+    fontSize: 16,
+    color: '#007AFF',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modalPlaceholder: {
+    width: 50,
+  },
+  commentsList: {
+    flex: 1,
+    padding: 16,
+  },
+  noComments: {
+    textAlign: 'center',
+    color: '#999',
+    marginTop: 40,
+    fontSize: 14,
+  },
+  commentItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 12,
+  },
+  commentContent: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 12,
+  },
+  commentAuthor: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  commentInputContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    gap: 8,
+    alignItems: 'flex-end',
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    fontSize: 14,
+    maxHeight: 100,
   },
 });

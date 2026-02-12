@@ -42,6 +42,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  avatarColor: {
+    type: String,
+    enum: ['blue', 'purple', 'green', 'orange', 'pink'],
+    default: 'blue'
+  },
   followers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'

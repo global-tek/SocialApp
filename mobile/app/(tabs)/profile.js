@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { postService } from '../../services';
 import PostCard from '../../components/PostCard';
+import UserAvatar from '../../components/UserAvatar';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -82,11 +83,9 @@ export default function ProfileScreen() {
         )}
 
         <View style={styles.profileSection}>
-          <Avatar.Image
+          <UserAvatar
+            user={user}
             size={100}
-            source={{
-              uri: user?.profilePicture || 'https://via.placeholder.com/100',
-            }}
             style={styles.avatar}
           />
 
